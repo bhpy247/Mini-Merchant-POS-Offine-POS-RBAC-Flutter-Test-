@@ -18,4 +18,16 @@ class UserModel {
   Map<String, dynamic> toJson() {
     return {'username': username, 'role': role, 'token': token};
   }
+
+  UserModel copyWith({
+    String? username,
+    String? role,
+    String? token
+  }) {
+    return UserModel(
+      username: username ?? this.username,
+      role: role ?? this.role,
+      token: token ?? this.token,
+    );
+  }
 }

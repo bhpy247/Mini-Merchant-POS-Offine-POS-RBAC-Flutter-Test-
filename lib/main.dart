@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:minipostest/data/datasource/remote/payment_remote_datasource.dart';
+import 'package:minipostest/data/datasource/remote/sync_remote_datasource.dart';
+import 'package:minipostest/presentation/providers/connectivity_provider.dart';
+import 'package:minipostest/presentation/providers/report_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'core/services/connectivity_service.dart';
@@ -7,9 +11,11 @@ import 'core/services/hive_service.dart';
 
 import 'core/utils/provider_refrence.dart';
 import 'data/datasource/remote/auth_remote_datasource.dart';
+import 'data/datasource/remote/cart_remote_datasource.dart';
 import 'data/datasource/remote/order_remote_datasource.dart';
 import 'data/datasource/remote/product_remote_datasource.dart';
 
+import 'data/datasource/remote/report_remote_datasource.dart';
 import 'data/repsitory/auth_repo_impl.dart';
 import 'data/repsitory/product_repo_impl.dart';
 import 'presentation/providers/auth_provider.dart';
@@ -26,13 +32,13 @@ void main() async {
 
   await HiveService.init();
 
-  final orderProvider = OrderProvider(OrderRemoteDatasource());
+  final orderProvider = OrderProvider(OrderRemoteDatasource(),PaymentRemoteDatasource(), SyncRemoteDatasource());
 
   orderProviderReference = orderProvider;
 
   ConnectivityService.connectionStream.listen((isConnected) {
     if (isConnected) {
-      orderProvider.syncPendingOrders();
+      orderProvider.syncOfflineOrders();
     }
   });
 
@@ -56,9 +62,19 @@ class MyApp extends StatelessWidget {
           create: (_) => ProductProvider(ProductRepositoryImpl(ProductRemoteDatasource())),
         ),
 
-        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider(CartRemoteDatasource())),
 
         ChangeNotifierProvider(create: (_) => orderProvider),
+        ChangeNotifierProvider(
+
+          create: (_) => ReportsProvider(
+            ReportsRemoteDatasource(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              ConnectivityProvider(),
+        ),
       ],
 
       child: MaterialApp(

@@ -9,7 +9,6 @@ class ReportsRemoteDatasource {
 
   Future<dynamic> getPendingSync() async {
     final response = await DioClient.dio.get("/reports/pending-sync");
-
     return response.data;
   }
 }

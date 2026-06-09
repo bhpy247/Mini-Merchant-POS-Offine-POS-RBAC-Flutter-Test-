@@ -16,6 +16,8 @@ class OrderModel {
   final SyncStatus syncStatus;
 
   final DateTime createdAt;
+  final String paymentRef;
+  final int serverOrderId;
 
   OrderModel({
     required this.localOrderId,
@@ -25,12 +27,15 @@ class OrderModel {
     required this.paymentStatus,
     required this.syncStatus,
     required this.createdAt,
+    required this.paymentRef,
+    required this.serverOrderId,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
       localOrderId: ParsingHelper.parseStringMethod(json['localOrderId']),
-
+      paymentRef: ParsingHelper.parseStringMethod(json['paymentRef']),
+      serverOrderId: ParsingHelper.parseIntMethod(json['serverOrderId']),
       items: ParsingHelper.parseListMethod<dynamic, dynamic>(json['items']).map((e) {
         return CartItemModel.fromJson(e);
       }).toList(),
@@ -46,25 +51,20 @@ class OrderModel {
         orElse: () => SyncStatus.pending,
       ),
 
-      createdAt:
-          DateTime.tryParse(ParsingHelper.parseStringMethod(json['createdAt'])) ?? DateTime.now(),
+      createdAt: DateTime.tryParse(ParsingHelper.parseStringMethod(json['createdAt'])) ?? DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       "localOrderId": localOrderId,
-
       "items": items.map((e) => e.toJson()).toList(),
-
       "total": total,
-
       "paymentMode": paymentMode,
-
       "paymentStatus": paymentStatus,
-
       "syncStatus": syncStatus.name,
-
+      "paymentRef": paymentRef,
+      "serverOrderId": serverOrderId,
       "createdAt": createdAt.toIso8601String(),
     };
   }
@@ -77,13 +77,16 @@ class OrderModel {
     String? paymentStatus,
     SyncStatus? syncStatus,
     DateTime? createdAt,
+    String? paymentRef,
+    int? serverOrderId,
   }) {
     return OrderModel(
       localOrderId: localOrderId ?? this.localOrderId,
 
       items: items ?? this.items,
-
+      paymentRef: paymentRef ?? this.paymentRef,
       total: total ?? this.total,
+      serverOrderId: serverOrderId ?? this.serverOrderId,
 
       paymentMode: paymentMode ?? this.paymentMode,
 

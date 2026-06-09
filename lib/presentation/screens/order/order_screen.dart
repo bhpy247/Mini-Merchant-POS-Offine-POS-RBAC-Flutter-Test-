@@ -42,36 +42,45 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ],
       ),
 
-      body: ListView.builder(
-        itemCount: provider.orders.length,
-
-        itemBuilder: (context, index) {
-          final order = provider.orders[index];
-
-          return Card(
-            margin: const EdgeInsets.all(10),
-
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  Text(order.localOrderId, style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                  const SizedBox(height: 10),
-
-                  Text("Total: ₹${order.total}"),
-
-                  const SizedBox(height: 10),
-
-                  StatusBadge(status: order.syncStatus),
-                ],
-              ),
-            ),
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await context.read<OrderProvider>().loadOrders();
         },
+        child: ListView.builder(
+          itemCount: provider.orders.length,
+
+          itemBuilder: (context, index) {
+            final order = provider.orders[index];
+
+            return Card(
+              margin: const EdgeInsets.all(10),
+
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                  children: [
+                    Text(order.localOrderId, style: const TextStyle(fontWeight: FontWeight.bold)),
+
+                    const SizedBox(height: 10),
+                    Text("Payment: ${order.paymentStatus}"),
+                    const SizedBox(height: 10),
+                    Text("Payment Ref: ${order.paymentRef}"),
+                    const SizedBox(height: 10),
+
+                    Text("Total: ₹${order.total}"),
+
+                    const SizedBox(height: 10),
+
+                    StatusBadge(status: order.syncStatus),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

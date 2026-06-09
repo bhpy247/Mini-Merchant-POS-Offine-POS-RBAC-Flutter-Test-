@@ -27,10 +27,7 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.addToCart(
-        productId: product.id,
-        quantity: getProductQuantity(product.id),
-      );
+      await remoteDatasource.addToCart(productId: product.id, quantity: getProductQuantity(product.id));
     } catch (_) {}
   }
 
@@ -84,5 +81,15 @@ class CartProvider extends ChangeNotifier {
     }
 
     return value;
+  }
+
+  Future<void> removeEntireItem(int productId) async {
+    _items.removeWhere((e) => e.product.id == productId);
+
+    notifyListeners();
+
+    try {
+      await remoteDatasource.removeFromCart(productId);
+    } catch (_) {}
   }
 }

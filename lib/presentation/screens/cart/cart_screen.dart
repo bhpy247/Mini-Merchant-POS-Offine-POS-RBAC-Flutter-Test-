@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/utils/snackbar_helper.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../widgets/payment_bottom_sheet.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -10,7 +12,7 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CartProvider>();
-    final orderProvider = context.read<OrderProvider>();
+    final orderProvider = context.watch<OrderProvider>();
     return Scaffold(
       appBar: AppBar(title: const Text("Cart")),
 
@@ -28,7 +30,37 @@ class CartScreen extends StatelessWidget {
 
                   subtitle: Text("Qty: ${item.quantity}"),
 
-                  trailing: Text("₹${item.product.price * item.quantity}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          provider.decrementQty(item.product);
+                        },
+
+                        icon: const Icon(Icons.remove),
+                      ),
+
+                      Text("${item.quantity}"),
+
+                      IconButton(
+                        onPressed: () {
+                          provider.addToCart(item.product);
+                        },
+
+                        icon: const Icon(Icons.add),
+                      ),
+
+                      IconButton(
+                        onPressed: () {
+                          provider.removeEntireItem(item.product.id);
+                        },
+
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -47,18 +79,40 @@ class CartScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 ElevatedButton(
-                  onPressed: () async {
-                    await orderProvider.createOrder(items: provider.items, total: provider.total, );
+                  onPressed: orderProvider.isLoading
+                      ? null
+                      : () async {
+                          try {
+                            final order = await context.read<OrderProvider>().createOrder(
+                              items: provider.items,
 
-                    provider.clearCart();
+                              total: provider.total,
+                            );
 
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text("Order Created")));
-                    }
-                  },
-                  child: const Text("Create Order"),
+                            if (context.mounted && order.serverOrderId != 0) {
+                              showModalBottomSheet(
+                                context: context,
+
+                                isScrollControlled: true,
+
+                                builder: (_) {
+                                  return PaymentBottomSheet(order: order);
+                                },
+                              );
+                            }
+                          } catch (e) {
+                            SnackbarHelper.showError(context: context, message: "Failed to create order");
+                          }
+                        },
+
+                  child: orderProvider.isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text("Checkout"),
                 ),
               ],
             ),

@@ -7,12 +7,34 @@ class PaymentRemoteDatasource {
     required double amount,
 
     required String localOrderId,
+
+    required String paymentMode,
+
+    required String paymentRef,
+
+    required int serverOrderId,
   }) async {
     final response = await DioClient.dio.post(
       "/payments",
 
-      data: {"order_id": orderId, "amount": amount, "localOrderId": localOrderId},
+      data: {
+        "amount": amount,
+
+        "localOrderId": localOrderId,
+
+        "paymentMode": paymentMode,
+
+        "paymentRef": paymentRef,
+
+        "serverOrderId": serverOrderId,
+      },
     );
+
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getPaymentStatus(int paymentId) async {
+    final response = await DioClient.dio.get("/payments/$paymentId");
 
     return response.data;
   }

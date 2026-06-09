@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:minipostest/presentation/providers/auth_provider.dart';
+import 'package:minipostest/presentation/screens/main_screen.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/services/storage_service.dart';
 import 'dashboard/dashboard_screen.dart';
@@ -24,12 +27,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final token = await StorageService.getToken();
 
+
+
     if (!mounted) return;
 
     if (token != null && token.isNotEmpty) {
+      String role = await StorageService.getRole() ?? "ADMIN";
+      context.read<AuthProvider>().user?.copyWith(role: role);
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));

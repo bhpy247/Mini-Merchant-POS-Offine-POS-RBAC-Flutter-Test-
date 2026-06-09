@@ -12,6 +12,9 @@ class StatusBadge extends StatelessWidget {
       case SyncStatus.pending:
         return Colors.orange;
 
+      case SyncStatus.orderCreated:
+        return Colors.purple;
+
       case SyncStatus.paid:
         return Colors.blue;
 
@@ -20,6 +23,8 @@ class StatusBadge extends StatelessWidget {
 
       case SyncStatus.failed:
         return Colors.red;
+
+
     }
   }
 
@@ -28,14 +33,20 @@ class StatusBadge extends StatelessWidget {
       case SyncStatus.pending:
         return Icons.pending;
 
+      case SyncStatus.orderCreated:
+        return Icons.receipt_long;
+
       case SyncStatus.paid:
         return Icons.payments;
+
 
       case SyncStatus.synced:
         return Icons.check_circle;
 
       case SyncStatus.failed:
         return Icons.error;
+
+
     }
   }
 

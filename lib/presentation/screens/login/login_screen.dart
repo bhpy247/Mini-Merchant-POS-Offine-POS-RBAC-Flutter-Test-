@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:minipostest/presentation/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/storage_service.dart';
@@ -60,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (success && context.mounted) {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                    MaterialPageRoute(builder: (_) => const MainScreen()),
                   );
                 }
               },

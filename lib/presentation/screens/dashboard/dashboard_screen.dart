@@ -6,6 +6,7 @@ import '../../../core/utils/permission_handler.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
+import '../admin_report/admin_report_screen.dart';
 import '../cart/cart_screen.dart';
 import '../login/login_screen.dart';
 import '../order/order_screen.dart';
@@ -18,12 +19,14 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  String role = "";
+
   @override
   void initState() {
     super.initState();
-
-    Future.microtask(() {
+    Future.microtask(() async {
       context.read<ProductProvider>().getProducts();
+      role = await StorageService.getRole() ?? "ADMIN";
     });
   }
 
@@ -32,10 +35,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final authProvider = context.read<AuthProvider>();
 
     final productProvider = context.watch<ProductProvider>();
-    final cartProvider = context.read<CartProvider>();
-
-    final role = authProvider.user?.role ?? "";
-
+    final cartProvider = context.watch<CartProvider>();
+    //
     return Scaffold(
       appBar: AppBar(
         title: Text("Dashboard - $role"),
@@ -44,30 +45,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             onPressed: () async {
               await StorageService.clear();
-
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             icon: const Icon(Icons.logout),
           ),
-          if (PermissionHelper.canCreateOrder(role))
-            IconButton(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
-              },
-              icon: const Icon(Icons.shopping_cart),
-            ),
-          if (PermissionHelper.canViewAllOrders(role))
-            IconButton(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
-              },
-              icon: const Icon(Icons.list),
-            ),
         ],
       ),
 
@@ -83,6 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 itemBuilder: (context, index) {
                   final product = productProvider.products[index];
+                  final qty = cartProvider.getProductQuantity(product.id);
 
                   return Card(
                     margin: const EdgeInsets.all(10),
@@ -92,22 +78,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Price: ₹${product.price}"),
-
-                          Text("Stock: ${product.stock}"),
-                        ],
+                        children: [Text("Price: ₹${product.price}"), Text("Stock: ${product.stock}")],
                       ),
 
-                      trailing: ElevatedButton(
-                        onPressed: () {
-                          cartProvider.addToCart(product);
+                      trailing: Consumer<CartProvider>(
+                        builder: (context, cartProvider, child) {
+                          final qty = cartProvider.getProductQuantity(product.id);
 
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text("${product.name} added")));
+                          return qty == 0
+                              ? ElevatedButton(
+                                  onPressed: () {
+                                    cartProvider.addToCart(product);
+                                  },
+
+                                  child: const Text("Add"),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(),
+
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+
+                                    children: [
+                                      IconButton(
+                                        onPressed: () {
+                                          cartProvider.decrementQty(product);
+                                        },
+
+                                        icon: const Icon(Icons.remove),
+                                      ),
+
+                                      Text("$qty"),
+
+                                      IconButton(
+                                        onPressed: () {
+                                          cartProvider.addToCart(product);
+                                        },
+
+                                        icon: const Icon(Icons.add),
+                                      ),
+                                    ],
+                                  ),
+                                );
                         },
-                        child: const Text("Add"),
                       ),
                     ),
                   );

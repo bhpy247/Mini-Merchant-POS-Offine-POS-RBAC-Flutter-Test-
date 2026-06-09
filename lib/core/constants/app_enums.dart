@@ -1,1 +1,12 @@
-enum SyncStatus { pending, paid, synced, failed }
+enum SyncStatus {
+
+  pending,
+
+  orderCreated,
+
+  paid,
+
+  synced,
+
+  failed,
+}
