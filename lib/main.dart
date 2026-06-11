@@ -32,7 +32,11 @@ void main() async {
 
   await HiveService.init();
 
-  final orderProvider = OrderProvider(OrderRemoteDatasource(),PaymentRemoteDatasource(), SyncRemoteDatasource());
+  final orderProvider = OrderProvider(
+    OrderRemoteDatasource(),
+    PaymentRemoteDatasource(),
+    SyncRemoteDatasource(),
+  );
 
   orderProviderReference = orderProvider;
 
@@ -54,9 +58,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(AuthRepositoryImpl(AuthRemoteDatasource())),
-        ),
+        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepositoryImpl(AuthRemoteDatasource()))),
 
         ChangeNotifierProvider(
           create: (_) => ProductProvider(ProductRepositoryImpl(ProductRemoteDatasource())),
@@ -65,16 +67,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartProvider(CartRemoteDatasource())),
 
         ChangeNotifierProvider(create: (_) => orderProvider),
-        ChangeNotifierProvider(
-
-          create: (_) => ReportsProvider(
-            ReportsRemoteDatasource(),
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              ConnectivityProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => ReportsProvider(ReportsRemoteDatasource())),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],
 
       child: MaterialApp(

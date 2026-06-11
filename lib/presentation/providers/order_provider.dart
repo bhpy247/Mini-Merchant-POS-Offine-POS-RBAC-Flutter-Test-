@@ -101,6 +101,7 @@ class OrderProvider extends ChangeNotifier {
       localOrderId: localOrderId,
 
       serverOrderId: 0,
+      retryCount: 0,
 
       items: items,
 
@@ -151,6 +152,7 @@ class OrderProvider extends ChangeNotifier {
       localOrderId: const Uuid().v4(),
 
       serverOrderId: 0,
+      retryCount: 0,
 
       items: items,
 
@@ -229,93 +231,129 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       isSyncing = true;
-
       notifyListeners();
 
       await loadOrders();
 
-      final offlineOrders = orders.where((e) {
-        return e.serverOrderId == 0;
-      }).toList();
+      final offlineOrders = orders
+          .where((e) => e.serverOrderId == 0 && e.syncStatus != SyncStatus.failed)
+          .toList();
 
-      if (offlineOrders.isEmpty) {
+      if (offlineOrders.isEmpty) return;
+
+      // ─────────────────────────────────────────────────────────
+      // STEP 1 — Sync orders to server & capture returned IDs
+      // ─────────────────────────────────────────────────────────
+      List<Map<String, dynamic>> syncedData = [];
+
+      try {
+        syncedData = await syncDatasource.syncOrders(offlineOrders);
+      } catch (e) {
+        debugPrint("❌ syncOrders failed: $e");
+        // Mark all as failed so they don't loop endlessly
+        for (final order in offlineOrders) {
+          await updateOrder(order.copyWith(syncStatus: SyncStatus.failed));
+        }
         return;
       }
 
-      /// STEP 1
-      /// SYNC ORDERS
+      // Build localOrderId → serverOrderId map from response
+      final serverIdMap = <String, int>{};
+      for (final item in syncedData) {
+        final localId = item["localOrderId"] as String?;
+        final serverId = item["id"];
+        if (localId != null && serverId != null) {
+          serverIdMap[localId] = (serverId is int)
+              ? serverId
+              : int.tryParse(serverId.toString()) ?? 0;
+        }
+      }
 
-      await syncDatasource.syncOrders(offlineOrders);
-
-      /// STEP 2
-      /// PROCESS PAYMENTS
-
+      // Persist the server IDs we just received
       for (final order in offlineOrders) {
+        final serverOrderId = serverIdMap[order.localOrderId] ?? 0;
+        if (serverOrderId != 0) {
+          await updateOrder(
+            order.copyWith(
+              serverOrderId: serverOrderId,
+              syncStatus: SyncStatus.orderCreated,
+            ),
+          );
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // STEP 2 — Process payments using real server IDs
+      // ─────────────────────────────────────────────────────────
+      for (final order in offlineOrders) {
+        final serverOrderId = serverIdMap[order.localOrderId] ?? 0;
+
+        if (serverOrderId == 0) {
+          // Server didn't return an ID for this order — mark failed
+          debugPrint("⚠️ No serverOrderId for ${order.localOrderId}, skipping payment");
+          await updateOrder(order.copyWith(syncStatus: SyncStatus.failed));
+          continue;
+        }
+
         try {
           final paymentRef = "txn-${DateTime.now().millisecondsSinceEpoch}";
 
           final response = await paymentDatasource.processPayment(
-            orderId: order.localOrderId,
-
+            orderId: serverOrderId.toString(),  // ✅ real server ID
             amount: order.total,
-
             localOrderId: order.localOrderId,
-
-            paymentMode: "OFFLINE",
-
+            paymentMode: order.paymentMode.isNotEmpty ? order.paymentMode : "OFFLINE",
             paymentRef: paymentRef,
-
-            serverOrderId: 0,
+            serverOrderId: serverOrderId,       // ✅ real server ID
           );
 
           final paidOrder = order.copyWith(
-            paymentMode: "OFFLINE",
-
+            serverOrderId: serverOrderId,
+            paymentMode: order.paymentMode.isNotEmpty ? order.paymentMode : "OFFLINE",
             paymentRef: ParsingHelper.parseStringMethod(response["paymentRef"]),
-
             paymentStatus: ParsingHelper.parseStringMethod(response["status"]),
-
             syncStatus: SyncStatus.paid,
           );
 
           await updateOrder(paidOrder);
         } catch (e) {
-          final failedOrder = order.copyWith(syncStatus: SyncStatus.failed);
-
-          await updateOrder(failedOrder);
+          debugPrint("❌ processPayment failed for ${order.localOrderId}: $e");
+          await updateOrder(order.copyWith(syncStatus: SyncStatus.failed));
         }
       }
 
-      /// RELOAD
-
+      // ─────────────────────────────────────────────────────────
+      // STEP 3 — Reload & sync payments that reached `paid`
+      // ─────────────────────────────────────────────────────────
       await loadOrders();
 
-      final paidOrders = orders.where((e) {
-        return e.syncStatus == SyncStatus.paid;
-      }).toList();
+      final paidOrders = orders
+          .where((e) => e.syncStatus == SyncStatus.paid)
+          .toList();
 
-      if (paidOrders.isEmpty) {
+      if (paidOrders.isEmpty) return;
+
+      try {
+        await syncDatasource.syncPayments(paidOrders); // ✅ now sends full payment data
+      } catch (e) {
+        debugPrint("❌ syncPayments failed: $e");
+        // Don't mark as failed — payments ARE processed, just not synced
+        // They'll be retried next time
         return;
       }
 
-      /// STEP 3
-      /// SYNC PAYMENTS
-
-      await syncDatasource.syncPayments(paidOrders);
-
-      /// STEP 4
-      /// MARK SYNCED
-
+      // ─────────────────────────────────────────────────────────
+      // STEP 4 — Mark synced
+      // ─────────────────────────────────────────────────────────
       for (final order in paidOrders) {
-        final syncedOrder = order.copyWith(syncStatus: SyncStatus.synced);
-
-        await updateOrder(syncedOrder);
+        await updateOrder(order.copyWith(syncStatus: SyncStatus.synced));
       }
+
+      debugPrint("✅ syncOfflineOrders complete — ${paidOrders.length} order(s) synced");
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("❌ syncOfflineOrders unexpected error: $e");
     } finally {
       isSyncing = false;
-
       notifyListeners();
     }
   }
@@ -325,14 +363,24 @@ class OrderProvider extends ChangeNotifier {
   Future<void> retryFailedOrders() async {
     await loadOrders();
 
-    final failedOrders = orders.where((e) {
-      return e.syncStatus == SyncStatus.failed;
-    }).toList();
+    final failedOrders = orders
+        .where((e) => e.syncStatus == SyncStatus.failed)
+        .toList();
 
     for (final order in failedOrders) {
-      final pendingOrder = order.copyWith(syncStatus: SyncStatus.pending);
+      final retryCount = (order.retryCount ?? 0) + 1;
 
-      await updateOrder(pendingOrder);
+      if (retryCount > 3) {
+        debugPrint("⛔ Order ${order.localOrderId} exceeded max retries, skipping");
+        continue;
+      }
+
+      await updateOrder(
+        order.copyWith(
+          syncStatus: SyncStatus.pending,
+          retryCount: retryCount,  // requires adding retryCount field to OrderModel
+        ),
+      );
     }
 
     await syncOfflineOrders();

@@ -18,6 +18,7 @@ class OrderModel {
   final DateTime createdAt;
   final String paymentRef;
   final int serverOrderId;
+  final int retryCount; // default: 0
 
   OrderModel({
     required this.localOrderId,
@@ -29,6 +30,7 @@ class OrderModel {
     required this.createdAt,
     required this.paymentRef,
     required this.serverOrderId,
+    required this.retryCount
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +47,7 @@ class OrderModel {
       paymentMode: ParsingHelper.parseStringMethod(json['paymentMode']),
 
       paymentStatus: ParsingHelper.parseStringMethod(json['paymentStatus']),
+      retryCount: ParsingHelper.parseIntMethod(json['retryCount']),
 
       syncStatus: SyncStatus.values.firstWhere(
         (e) => e.name == json['syncStatus'],
@@ -79,6 +82,7 @@ class OrderModel {
     DateTime? createdAt,
     String? paymentRef,
     int? serverOrderId,
+    int? retryCount   ,
   }) {
     return OrderModel(
       localOrderId: localOrderId ?? this.localOrderId,
@@ -95,6 +99,7 @@ class OrderModel {
       syncStatus: syncStatus ?? this.syncStatus,
 
       createdAt: createdAt ?? this.createdAt,
+      retryCount: retryCount ?? this.retryCount
     );
   }
 }
